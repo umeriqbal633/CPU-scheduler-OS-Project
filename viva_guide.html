@@ -1,0 +1,510 @@
+<title>Mini CPU Scheduler Viva</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: single reading column, sticky member switcher, Q&A as collapsible cards grouped by topic */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5b6577;
+  --line: #dde2ea;
+  --accent: #b4580a;
+  --accent-soft: #fbeedd;
+  --ink: #23324d;
+  --code-bg: #eef1f6;
+  --umer: #2f6db5;
+  --taha: #23856b;
+  --afraz: #8a4bb0;
+  --all: #b4580a;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2c3442;
+    --accent: #f0a25a; --accent-soft: #3a2a1a; --ink: #c9d6ee; --code-bg: #232b37;
+    --umer: #7fb0ec; --taha: #5fc9a8; --afraz: #c79be6; --all: #f0a25a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #9aa4b5; --line: #2c3442;
+  --accent: #f0a25a; --accent-soft: #3a2a1a; --ink: #c9d6ee; --code-bg: #232b37;
+  --umer: #7fb0ec; --taha: #5fc9a8; --afraz: #c79be6; --all: #f0a25a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 64px; }
+header h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; color: var(--ink); text-wrap: balance; letter-spacing: -0.01em; }
+header .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+header p { margin: 0; color: var(--muted); max-width: 65ch; }
+.cmd { font-family: var(--font-mono); font-size: 13px; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5; background: var(--code-bg); padding: 10px 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 14px; margin-top: 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { font: 500 13px var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 6px 12px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.tab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--muted)); }
+.tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab:focus-visible, .toggle:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle { font: 500 13px var(--font-body); border: 1px solid var(--accent); color: var(--accent); background: transparent; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+.toggle[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+
+section.member { margin-top: 36px; }
+.mhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; border-left: 4px solid var(--c); padding-left: 12px; }
+.mhead h2 { margin: 0; font-size: 21px; color: var(--ink); }
+.mhead .roll { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.mhead .owns { flex-basis: 100%; color: var(--muted); font-size: 14px; }
+h3 { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 26px 0 8px; font-weight: 500; }
+.qs { display: flex; flex-direction: column; gap: 8px; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+summary { list-style: none; cursor: pointer; padding: 11px 14px; display: flex; gap: 10px; font-weight: 600; color: var(--fg); }
+summary::-webkit-details-marker { display: none; }
+summary .n { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--c, var(--muted)); min-width: 28px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+summary .q { flex: 1; min-width: 0; }
+summary::after { content: "+"; font-family: var(--font-mono); color: var(--muted); }
+details[open] summary::after { content: "–"; }
+.a { padding: 0 14px 12px 52px; color: var(--fg); min-width: 0; }
+.a p { margin: 0 0 8px; }
+.a ul { margin: 0 0 8px; padding-left: 18px; }
+.a li { margin-bottom: 3px; }
+.tip { font-size: 13px; color: var(--muted); }
+.tip strong { color: var(--accent); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13px; margin: 6px 0 8px; }
+th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+th { background: var(--code-bg); font-weight: 600; }
+footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+@media (max-width: 520px) { .a { padding-left: 14px; } header h1 { font-size: 23px; } }
+@media (prefers-reduced-motion: no-preference) { details[open] .a { animation: fade .15s ease-out; } @keyframes fade { from { opacity: .4 } to { opacity: 1 } } }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">OS Lab · Mini CPU Scheduler · Viva prep</p>
+  <h1>Viva questions and answers</h1>
+  <p>Each member's own parts, plus a shared section everyone must know, because each member is tested on the whole system. Turn on <strong>Quiz mode</strong> to hide the answers and test yourself. Keep <span class="cmd">./scheduler inputs/jobs1.txt rr 2</span> open while you practise.</p>
+</header>
+
+<div class="bar">
+  <div class="tabs" role="group" aria-label="Show questions for">
+    <button class="tab" id="tab-all" data-show="all" aria-pressed="true" style="--c: var(--muted)"><span class="dot"></span>All</button>
+    <button class="tab" id="tab-common" data-show="common" aria-pressed="false" style="--c: var(--all)"><span class="dot"></span>Everyone</button>
+    <button class="tab" id="tab-umer" data-show="umer" aria-pressed="false" style="--c: var(--umer)"><span class="dot"></span>Umer</button>
+    <button class="tab" id="tab-taha" data-show="taha" aria-pressed="false" style="--c: var(--taha)"><span class="dot"></span>Taha</button>
+    <button class="tab" id="tab-afraz" data-show="afraz" aria-pressed="false" style="--c: var(--afraz)"><span class="dot"></span>Afraz</button>
+  </div>
+  <button class="toggle" id="quiz" aria-pressed="false">Quiz mode: off</button>
+</div>
+
+<!-- ===================================================== EVERYONE -->
+<section class="member" data-member="common" style="--c: var(--all)">
+  <div class="mhead"><h2>Everyone</h2><span class="owns">The examiner can ask any member these. All three of you must answer them confidently.</span></div>
+
+  <h3>Big picture</h3>
+  <div class="qs">
+    <details open><summary><span class="n">E1</span><span class="q">Explain the overall architecture of your project.</span></summary><div class="a">
+      <p>There are three programs. <code>scheduler</code> is the main process. Inside it, the <b>dispatcher</b> (main thread) owns the clock and decides who runs, an <b>arrival thread</b> moves jobs into the ready queue at their arrival time, and there is <b>one thread per job</b>.</p>
+      <p>The scheduler forks a <b>logger</b> process and sends it events through a <b>pipe</b>; the logger writes them to <code>schedule.log</code>. At the end, the scheduler forks and execs a <b>report</b> process and passes it the final metrics through <b>shared memory</b>, guarded by a semaphore.</p>
+      <pre>main: load_jobs → logger_start → run_algorithm (×1 or ×4) → report_run → logger_stop</pre>
+    </div></details>
+
+    <details open><summary><span class="n">E2</span><span class="q">How does your program make sure only one job uses the CPU at a time?</span></summary><div class="a">
+      <p>Every job thread blocks on its own semaphore <code>run_sem[i]</code> (initial value 0). Only the dispatcher posts it, and it posts exactly one job, then immediately blocks on <code>sem_wait(done_sem)</code>. It does not decide again until that job posts <code>done_sem</code>. So at any moment at most one job thread is awake.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E3</span><span class="q">Walk through one time unit of the dispatcher.</span></summary><div class="a">
+      <ul>
+        <li>Set <code>clock = t</code>, <code>sem_post(tick_sem)</code>, <code>sem_wait(arrived_sem)</code>. The arrival thread queues every job with arrival ≤ t.</li>
+        <li>Lock the mutex, call <code>pick_next()</code> (the algorithm decides), unlock.</li>
+        <li>If nothing is ready, the CPU is IDLE for one unit.</li>
+        <li>If the chosen job differs from the last one, count a context switch.</li>
+        <li><code>sem_post(run_sem[job])</code>, <code>sem_wait(done_sem)</code>. The job runs one unit.</li>
+        <li><code>t++</code>, update the Gantt chart; if remaining is 0, record completion.</li>
+      </ul>
+    </div></details>
+
+    <details open><summary><span class="n">E4</span><span class="q">Trace jobs1.txt with Round Robin, quantum 2.</span></summary><div class="a">
+      <p>P1(0,5), P2(1,3), P3(2,8).</p>
+      <ul>
+        <li>0–2 P1. At t=2, P3 arrives first, <i>then</i> P1 is preempted. Queue: P2, P3, P1.</li>
+        <li>2–4 P2 → queue P3, P1, P2. 4–6 P3 → P1, P2, P3. 6–8 P1 → P2, P3, P1.</li>
+        <li>8–9 P2 finishes (only 1 left). 9–11 P3. 11–12 P1 finishes. 12–16 P3 alone.</li>
+      </ul>
+      <p>Completion 12, 9, 16. Averages TAT 11.33, WT 6.00, RT 1.00. Context switches: 7.</p>
+    </div></details>
+  </div>
+
+  <h3>Synchronisation</h3>
+  <div class="qs">
+    <details open><summary><span class="n">E5</span><span class="q">What does your mutex protect?</span></summary><div class="a">
+      <p><code>Sim.lock</code> protects everything the threads share: the ready queue, the clock, the <code>released</code> counter, and each job's changing fields (<code>remaining</code>, <code>first_start</code>, <code>completion</code>). A second mutex, <code>log_lock</code>, protects writes to the pipe so log lines from two threads never mix.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E6</span><span class="q">List your semaphores and their initial values.</span></summary><div class="a">
+      <div class="table-wrap"><table>
+        <tr><th>Semaphore</th><th>Init</th><th>Meaning</th></tr>
+        <tr><td><code>run_sem[i]</code></td><td>0</td><td>dispatcher → job i: you may run</td></tr>
+        <tr><td><code>done_sem</code></td><td>0</td><td>job → dispatcher: my unit is finished</td></tr>
+        <tr><td><code>tick_sem</code></td><td>0</td><td>dispatcher → arrival thread: clock is now t</td></tr>
+        <tr><td><code>arrived_sem</code></td><td>0</td><td>arrival thread → dispatcher: arrivals for t queued</td></tr>
+        <tr><td><code>/mini_sched_ready_&lt;pid&gt;</code></td><td>0</td><td>named, between processes: report may read shared memory</td></tr>
+      </table></div>
+      <p>All start at 0 because each one means "an event has happened", and at the start nothing has happened yet.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E7</span><span class="q">What is the difference between a mutex and a semaphore? Why did you use both?</span></summary><div class="a">
+      <p>A mutex is a lock: the thread that locks it must unlock it, and it protects a critical section. A semaphore is a counter that any thread can post and any thread can wait on, so it is used for <b>signalling</b> between threads (one thread tells another "go").</p>
+      <p>We use the mutex to protect shared data, and semaphores for the handoff between dispatcher, arrival thread and job threads.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E8</span><span class="q">What is busy waiting and how did you avoid it?</span></summary><div class="a">
+      <p>Busy waiting is a loop that keeps checking a variable while burning CPU (e.g. <code>while(!ready);</code>). Every wait in our code is <code>sem_wait</code>, <code>pthread_mutex_lock</code>, <code>pthread_join</code> or <code>waitpid</code>, which put the thread to sleep. <code>nanosleep</code> is used only to simulate one unit of work or idle time. A full run uses about 0% CPU.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E9</span><span class="q">What is a data race? How do you know you have none?</span></summary><div class="a">
+      <p>Two threads access the same variable at the same time, at least one writes, and there is no synchronisation. Every shared variable is accessed under the mutex or protected by the semaphore protocol. We built the program with GCC's <b>ThreadSanitizer</b> (<code>-fsanitize=thread</code>) and ran all inputs in <code>all</code> mode: zero warnings.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E10</span><span class="q">What is a deadlock? Can your program deadlock?</span></summary><div class="a">
+      <p>Deadlock is when threads wait for each other forever. The only place two locks are held together is <code>Sim.lock</code> then <code>log_lock</code> (when <code>log_event</code> is called while holding the main lock). That order is always the same and never reversed, so a cycle cannot form. Each semaphore post has exactly one matching wait.</p>
+    </div></details>
+  </div>
+
+  <h3>Processes and metrics</h3>
+  <div class="qs">
+    <details open><summary><span class="n">E11</span><span class="q">What is the difference between fork() and exec()?</span></summary><div class="a">
+      <p><code>fork()</code> creates a copy of the current process; both continue from the same point (returns 0 in the child, the child's pid in the parent). <code>exec()</code> replaces the current process's program with a new program; the pid stays the same and open file descriptors stay open unless marked close-on-exec. We fork, then exec <code>./logger</code> and <code>./report</code> in the child.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E12</span><span class="q">What is a zombie process and how do you avoid one?</span></summary><div class="a">
+      <p>A child that has exited but whose parent has not collected its exit status. We call <code>waitpid()</code> on both the logger and the report process, so neither is left as a zombie.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E13</span><span class="q">Give the formulas for turnaround, waiting and response time.</span></summary><div class="a">
+      <ul>
+        <li>Turnaround = completion − arrival</li>
+        <li>Waiting = turnaround − burst</li>
+        <li>Response = first time on CPU − arrival</li>
+      </ul>
+      <p>For non-preemptive algorithms (FCFS, SJF) waiting equals response, because a job runs to completion once it starts.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E14</span><span class="q">What counts as a context switch in your program?</span></summary><div class="a">
+      <p>The CPU going from one job directly to a <i>different</i> job. The first dispatch is not counted, and switches to or from IDLE are not counted. If RR's quantum ends and no one else is waiting, the same job continues: no switch.</p>
+    </div></details>
+
+    <details open><summary><span class="n">E15</span><span class="q">Which algorithm is best? Look at your results.</span></summary><div class="a">
+      <p>It depends on the goal. SRTF gives the lowest average waiting and turnaround (jobs4: 7.30 vs FCFS 25.90) but can starve long jobs (jobs5: P1 waits 18). RR gives good response time (fair, interactive) but the most context switches (jobs4: 25). FCFS is simple but suffers the convoy effect when a long job arrives first.</p>
+    </div></details>
+  </div>
+</section>
+
+<!-- ===================================================== UMER -->
+<section class="member" data-member="umer" style="--c: var(--umer)">
+  <div class="mhead"><h2>Umer Iqbal</h2><span class="roll">24i-2528 · leader</span><span class="owns">Part 3 live execution (<code>engine.c</code>), Part 2 algorithms (<code>algorithms.c</code>), main program (<code>scheduler.c</code>)</span></div>
+
+  <h3>Live execution · engine.c</h3>
+  <div class="qs">
+    <details open><summary><span class="n">U1</span><span class="q">Why does the dispatcher give the CPU one time unit at a time instead of a whole slice?</span></summary><div class="a">
+      <p>So it can make a decision at <b>every time boundary</b>. SRTF must preempt the moment a shorter job arrives, and RR must queue a new arrival before the preempted job at the exact tick. With unit-by-unit dispatch both rules happen naturally; the job thread still does all the "running" and printing, exactly as in Figure 2.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U2</span><span class="q">Why do you need the tick/arrived handshake? What would go wrong without it?</span></summary><div class="a">
+      <p>Without it, the arrival thread and the dispatcher would race: at time t the dispatcher might call <code>pick_next()</code> before the arrival thread has queued a job that arrives at t. The result would change from run to run. With RR, the preempted job could end up before the new arrival, breaking the brief's rule. The handshake guarantees: <b>all arrivals for t are queued before any decision at t</b>.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U3</span><span class="q">What is a job thread doing when it is not running?</span></summary><div class="a">
+      <p>It is blocked inside <code>sem_wait(&amp;run_sem[i])</code>. The OS puts it to sleep, so it uses no CPU. It wakes only when the dispatcher posts its semaphore.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U4</span><span class="q">Show the job thread loop and explain each line.</span></summary><div class="a">
+<pre>do {
+  sem_wait(&amp;run_sem[i]);      // wait for the CPU
+  lock; print "[t] Pi running"; unlock
+  sleep_unit();                // simulate 1 unit of work
+  lock; rem = --remaining; unlock
+  sem_post(&amp;done_sem);         // give the CPU back
+} while (rem &gt; 0);             // done → thread returns</pre>
+      <p>It prints the remaining time <i>before</i> the unit, matching the sample output.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U5</span><span class="q">How do threads end and why do you join them?</span></summary><div class="a">
+      <p>A job thread returns after its last unit (remaining reaches 0). The arrival thread returns after it has released all jobs. The dispatcher calls <code>pthread_join</code> on all of them, which waits for them and frees their resources. Only after joining do we compute metrics, so no locking is needed there.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U6</span><span class="q">How is idle time handled?</span></summary><div class="a">
+      <p>If <code>pick_next()</code> returns -1, nothing is ready. The dispatcher prints <code>CPU IDLE</code>, adds an IDLE segment to the Gantt chart, sleeps one unit, increments t and loops. It still posts <code>tick_sem</code> every unit, so jobs arrive on time. The loop cannot spin forever because unfinished jobs must still be on the way.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U7</span><span class="q">In all mode, do you reuse threads between algorithms?</span></summary><div class="a">
+      <p>No. Each call to <code>run_algorithm()</code> allocates a fresh <code>Sim</code>, copies the original jobs, creates new threads, semaphores and mutex, and destroys them all at the end. The four runs are completely independent.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U8</span><span class="q">What if the dispatcher posted two run semaphores at once?</span></summary><div class="a">
+      <p>Two jobs would run at the same time, which is impossible on one CPU, and their output and timing would mix. That is why the dispatcher always posts one and waits for <code>done_sem</code> before doing anything else.</p>
+    </div></details>
+  </div>
+
+  <h3>Algorithms · algorithms.c</h3>
+  <div class="qs">
+    <details open><summary><span class="n">U9</span><span class="q">How does pick_next() work for each algorithm?</span></summary><div class="a">
+      <ul>
+        <li><b>FCFS / SJF</b> (non-preemptive): if a job is running, return it. Otherwise pick lowest arrival (FCFS) or lowest burst (SJF).</li>
+        <li><b>SRTF</b>: find the lowest remaining in the queue; preempt only if it is <i>strictly</i> less than the running job's remaining.</li>
+        <li><b>RR</b>: keep the running job while <code>quantum_used &lt; q</code>. When the quantum is used and someone is waiting, push it to the back and take the front.</li>
+      </ul>
+    </div></details>
+
+    <details open><summary><span class="n">U10</span><span class="q">How are ties broken?</span></summary><div class="a">
+      <p>In <code>better()</code>: first the algorithm's key (arrival / burst / remaining), then earlier arrival, then smaller id. Ids are compared with <code>job_id_cmp()</code>, a "natural" comparison, so P2 &lt; P10 (plain <code>strcmp</code> would say P10 &lt; P2).</p>
+    </div></details>
+
+    <details open><summary><span class="n">U11</span><span class="q">In SRTF, what happens if a new job's remaining time equals the running job's?</span></summary><div class="a">
+      <p>The running job continues. We preempt only with a strict <code>&lt;</code>, as the brief says. This also avoids a pointless context switch.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U12</span><span class="q">In RR, what if the quantum expires and the ready queue is empty?</span></summary><div class="a">
+      <p>The same job continues with a fresh quantum (<code>quantum_used = 0</code>). It is not preempted and no context switch is counted. You can see this in jobs1 from t=12 to 16, where P3 runs alone.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U13</span><span class="q">Where can starvation happen and why?</span></summary><div class="a">
+      <p>In SJF and SRTF. If short jobs keep arriving, a long job is never the shortest and keeps waiting. jobs5.txt shows it: P1 (burst 10) gets no CPU until t=18. FCFS and RR cannot starve a job: FCFS serves by arrival order, and RR gives every job a turn each round. Aging (raising priority over time) is the usual fix.</p>
+    </div></details>
+  </div>
+
+  <h3>Main program · scheduler.c</h3>
+  <div class="qs">
+    <details open><summary><span class="n">U14</span><span class="q">What checks does main() do on the command line?</span></summary><div class="a">
+      <p>There must be 2 or 3 arguments; the algorithm must be fcfs, sjf, srtf, rr or all; the quantum must be a positive whole number. If no quantum is given for rr/all, it uses 2 and prints a note. Any error prints a message and exits with code 1.</p>
+    </div></details>
+
+    <details open><summary><span class="n">U15</span><span class="q">Why does main() ignore SIGPIPE?</span></summary><div class="a">
+      <p>If the logger died, writing to the pipe would send SIGPIPE, whose default action kills the scheduler. With <code>SIG_IGN</code>, <code>write()</code> just returns an error (EPIPE) and we drop the log line; the scheduling continues.</p>
+    </div></details>
+  </div>
+</section>
+
+<!-- ===================================================== TAHA -->
+<section class="member" data-member="taha" style="--c: var(--taha)">
+  <div class="mhead"><h2>Taha Abid</h2><span class="roll">24i-2507</span><span class="owns">Part 1 job table (<code>jobtable.c</code>), Part 4 output (<code>output.c</code>), test inputs, <code>results.txt</code></span></div>
+
+  <h3>Job table · jobtable.c</h3>
+  <div class="qs">
+    <details open><summary><span class="n">T1</span><span class="q">How do you parse each line of the input file?</span></summary><div class="a">
+      <p>Read with <code>fgets</code>; cut everything after <code>#</code> (comments); split on spaces/tabs with <code>strtok_r</code>. Blank lines are skipped. There must be exactly 3 tokens: id, arrival, burst. Numbers are converted with <code>strtol</code>.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T2</span><span class="q">What bad input do you reject?</span></summary><div class="a">
+      <ul>
+        <li>Missing or unreadable file (message from <code>strerror(errno)</code>)</li>
+        <li>Empty file or only comments: "contains no jobs"</li>
+        <li>Wrong number of fields, values that are not whole numbers</li>
+        <li>Negative arrival or burst, burst of 0</li>
+        <li>Duplicate ids, id longer than 15 characters, the reserved id <code>IDLE</code></li>
+        <li>More than 64 jobs, or times above 10000</li>
+      </ul>
+      <p>Each message includes the line number, and the program exits with code 1.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T3</span><span class="q">How do you detect that "3.5" or "one" is not a valid number?</span></summary><div class="a">
+      <p><code>strtol</code> sets an end pointer to the first character it could not use. We require that the end pointer moved (something was read) and that it points to <code>'\0'</code> (nothing left over). For "3.5" the end stops at ".", for "one" it does not move, so both are rejected. We also check <code>errno == ERANGE</code> for overflow.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T4</span><span class="q">Why reject a burst time of 0 and the id IDLE?</span></summary><div class="a">
+      <p>A job with burst 0 never needs the CPU: its thread would have nothing to run and its metrics would be meaningless. <code>IDLE</code> is the label we use in the Gantt chart for an idle CPU, so a job with that name would be confused with idle time.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T5</span><span class="q">The input is not sorted. How do you handle that?</span></summary><div class="a">
+      <p>The job table keeps file order. In <code>run_algorithm()</code> we build an <code>order[]</code> array of job indices sorted by (arrival, id) with <code>qsort</code>. The arrival thread walks that array, so jobs are released in the right order whatever the file looks like. jobs3 and jobs4 are deliberately unsorted.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T6</span><span class="q">Which struct stores a job, and what is each field for?</span></summary><div class="a">
+      <p><code>Job</code>: <code>id</code>, <code>arrival</code>, <code>burst</code> (from the file); <code>remaining</code> (decreases while running); <code>first_start</code> (−1 until first dispatch, for response time); <code>completion</code> (−1 until finished).</p>
+    </div></details>
+  </div>
+
+  <h3>Output and metrics · output.c</h3>
+  <div class="qs">
+    <details open><summary><span class="n">T7</span><span class="q">How is the Gantt chart built?</span></summary><div class="a">
+      <p>After every unit the dispatcher calls <code>gantt_add(id, t)</code>. If the last segment has the same id and ends at t, it is extended by one; otherwise a new segment <code>{id, start, end}</code> is added. So "P1 P1 P2 P2" becomes two segments: P1 0–2, P2 2–4.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T8</span><span class="q">How does print_gantt() line up the times under the boxes?</span></summary><div class="a">
+      <p>Each box gets a width big enough for both its label and its start time (minimum 4). The time row prints each segment's start, left-aligned in the same width + 1 for the <code>|</code>, then the final end time. Long charts are split into rows of about 72 characters.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T9</span><span class="q">Where are the metrics calculated and printed?</span></summary><div class="a">
+      <p>Calculated in <code>engine.c</code> after all threads are joined (turnaround, waiting, response and their averages). Printed by <code>print_job_table()</code> and <code>print_comparison()</code> in <code>output.c</code>. The report program calls them on data read from shared memory. <code>output.c</code> is linked into both the scheduler and the report.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T10</span><span class="q">When is waiting time equal to response time?</span></summary><div class="a">
+      <p>When a job is never preempted: once it starts it runs to the end, so all its waiting happens before its first run. That is always true for FCFS and SJF. In RR or SRTF a job can wait again after it started, so waiting can be larger than response.</p>
+    </div></details>
+  </div>
+
+  <h3>Test inputs · inputs/</h3>
+  <div class="qs">
+    <details open><summary><span class="n">T11</span><span class="q">Explain each test input.</span></summary><div class="a">
+      <ul>
+        <li><b>jobs1</b>: the example from the brief; RR q=2 must give 11.33 / 6.00 / 1.00.</li>
+        <li><b>jobs2</b>: all jobs arrive at 0, so tie-breaking by id matters.</li>
+        <li><b>jobs3</b>: idle gap; the queue is empty from t=5 to 8 and from 13 to 15.</li>
+        <li><b>jobs4</b>: 10 jobs with very different results per algorithm.</li>
+        <li><b>jobs5</b>: bonus starvation demo for SJF/SRTF.</li>
+      </ul>
+    </div></details>
+
+    <details open><summary><span class="n">T12</span><span class="q">Why do the algorithms differ so much on jobs4?</span></summary><div class="a">
+      <p>A 20-unit job (P1) arrives first, followed by many short jobs. FCFS makes them all wait behind P1 (the <b>convoy effect</b>): avg waiting 25.90. SJF is also stuck behind P1 because it is non-preemptive (20.30). SRTF preempts P1 for each short job (7.30). RR shares the CPU evenly (14.50) but needs 25 context switches.</p>
+    </div></details>
+
+    <details open><summary><span class="n">T13</span><span class="q">In jobs2, why does RR have the worst waiting time but the best response time?</span></summary><div class="a">
+      <p>Every job gets the CPU within the first few slices (good response: 4.00), but all jobs are interleaved, so every job finishes late (worst waiting: 16.80). SJF finishes short jobs first, which minimises average waiting (8.60).</p>
+    </div></details>
+
+    <details open><summary><span class="n">T14</span><span class="q">What does make test check?</span></summary><div class="a">
+      <p>That jobs1 RR q=2 gives exactly the brief's per-job values, averages and Gantt chart; that each bad input file is rejected with a message and exit code 1; that bad command lines fail; and that no shared memory is left in <code>/dev/shm</code>.</p>
+    </div></details>
+  </div>
+</section>
+
+<!-- ===================================================== AFRAZ -->
+<section class="member" data-member="afraz" style="--c: var(--afraz)">
+  <div class="mhead"><h2>Afraz Ahmed</h2><span class="roll">24i-2498</span><span class="owns">Part 5 logger (<code>ipc.c</code>, <code>logger.c</code>), Part 6 report (<code>ipc.c</code>, <code>report.c</code>), <code>Makefile</code>, bonus</span></div>
+
+  <h3>Logger process · Part 5</h3>
+  <div class="qs">
+    <details open><summary><span class="n">A1</span><span class="q">Explain logger_start() step by step.</span></summary><div class="a">
+<pre>pipe(fds)                  // fds[0] read end, fds[1] write end
+fork()
+child:  close(fds[1])      // child only reads
+        dup2(fds[0], 0)    // pipe becomes stdin
+        close(fds[0])
+        execl("./logger", "logger", "schedule.log")
+parent: close(fds[0])      // parent only writes
+        log_fd = fds[1]</pre>
+    </div></details>
+
+    <details open><summary><span class="n">A2</span><span class="q">What does dup2() do, and why use it?</span></summary><div class="a">
+      <p><code>dup2(old, new)</code> makes file descriptor <code>new</code> refer to the same file as <code>old</code> (closing <code>new</code> first). <code>dup2(fds[0], STDIN_FILENO)</code> makes the pipe's read end become fd 0. The logger then just reads its standard input with <code>fgets(stdin)</code>; it does not know or care that it is a pipe.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A3</span><span class="q">Why must unused pipe ends be closed?</span></summary><div class="a">
+      <p>A reader only sees EOF when <b>every</b> write end is closed. If the logger kept its own copy of the write end open, it would never get EOF and would wait forever. Closing the unused read end in the parent is good hygiene and frees the descriptor.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A4</span><span class="q">How does the logger know when to stop?</span></summary><div class="a">
+      <p><code>logger_stop()</code> closes the write end. The logger's <code>fgets</code> returns NULL (EOF), the loop ends, it writes a footer, closes the file and exits. The scheduler then calls <code>waitpid</code> on it, so no zombie is left.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A5</span><span class="q">Why set FD_CLOEXEC on the pipe?</span></summary><div class="a">
+      <p>The report process is started later with fork + exec. Without close-on-exec it would inherit the pipe's write end and keep it open, so the logger would not see EOF until the report also exited. With <code>FD_CLOEXEC</code> the descriptor is closed automatically at exec. (<code>dup2</code> clears the flag on the logger's new fd 0, so its stdin stays open.)</p>
+    </div></details>
+
+    <details open><summary><span class="n">A6</span><span class="q">Which events are logged, and why is log_lock needed?</span></summary><div class="a">
+      <p>Job arrived, started, resumed, preempted, finished, plus CPU idle and run headers. Two threads call <code>log_event()</code>: the arrival thread and the dispatcher. <code>log_lock</code> makes each line one uninterrupted write so lines never mix, and it protects <code>log_fd</code> while <code>logger_stop()</code> closes it.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A7</span><span class="q">Why call fflush(stdout) before fork()?</span></summary><div class="a">
+      <p><code>printf</code> output is buffered in the process's memory. <code>fork()</code> copies that memory, so unflushed text would be printed twice, once by each process. Flushing first empties the buffer.</p>
+    </div></details>
+  </div>
+
+  <h3>Shared-memory report · Part 6</h3>
+  <div class="qs">
+    <details open><summary><span class="n">A8</span><span class="q">Which shared memory did you use? Explain the calls.</span></summary><div class="a">
+      <p>POSIX shared memory.</p>
+      <ul>
+        <li><code>shm_open(name, O_CREAT|O_EXCL|O_RDWR, 0600)</code>: create the object</li>
+        <li><code>ftruncate(fd, sizeof(SharedReport))</code>: give it a size (a new object has size 0)</li>
+        <li><code>mmap(..., MAP_SHARED, fd, 0)</code>: map it into memory, so writes are visible to the other process</li>
+        <li>At the end: <code>munmap</code>, <code>close</code>, <code>shm_unlink</code></li>
+      </ul>
+      <p>The report does the same with <code>O_RDONLY</code> and <code>PROT_READ</code>.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A9</span><span class="q">Explain the order of events in report_run().</span></summary><div class="a">
+      <ul>
+        <li>Create the shared memory and the named semaphore (value 0).</li>
+        <li>fork + exec <code>./report shm_name sem_name</code>. The report attaches and blocks on <code>sem_wait</code>.</li>
+        <li>The scheduler <code>memcpy</code>s all results into shared memory, then <code>sem_post</code>.</li>
+        <li>The report wakes up, prints the final report and exits; the scheduler <code>waitpid</code>s and cleans up.</li>
+      </ul>
+    </div></details>
+
+    <details open><summary><span class="n">A10</span><span class="q">Why start the report before writing the data?</span></summary><div class="a">
+      <p>To show that the semaphore really does the synchronisation. If we wrote first and then started the report, it would work even without the semaphore. Started first, the report would read empty or half-written data unless it waits for the post.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A11</span><span class="q">Why a named semaphore instead of sem_init?</span></summary><div class="a">
+      <p>After <code>exec</code> the report is a different program with a fresh address space, so it cannot use a semaphore variable from the scheduler's memory. A named semaphore (<code>sem_open</code> with a name) can be opened by any process that knows the name. (An unnamed semaphore placed inside the shared memory with <code>pshared = 1</code> would also work.)</p>
+    </div></details>
+
+    <details open><summary><span class="n">A12</span><span class="q">Why does the name contain the pid? Why O_EXCL?</span></summary><div class="a">
+      <p>The pid makes the name unique, so two students running the program at the same time on a lab machine do not share or destroy each other's segment. <code>O_EXCL</code> makes creation fail if the name already exists, so we never silently reuse old data.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A13</span><span class="q">What happens if you forget shm_unlink / sem_unlink?</span></summary><div class="a">
+      <p>POSIX shared memory and named semaphores live in the kernel (visible under <code>/dev/shm</code>) until unlinked or until reboot, even after the program exits. That leaks memory. <code>make test</code> checks <code>/dev/shm</code> to prove nothing is left.</p>
+    </div></details>
+
+    <details open><summary><span class="n">A14</span><span class="q">How does the scheduler find ./logger and ./report?</span></summary><div class="a">
+      <p>It reads <code>/proc/self/exe</code> (the path of the running program) and takes its directory. So it works even if you run it from another folder, e.g. <code>../scheduler jobs.txt fcfs</code>.</p>
+    </div></details>
+  </div>
+
+  <h3>Makefile · bonus</h3>
+  <div class="qs">
+    <details open><summary><span class="n">A15</span><span class="q">Explain the Makefile.</span></summary><div class="a">
+      <ul>
+        <li><code>all</code> builds three programs: <code>scheduler</code> (6 object files), <code>logger</code>, <code>report</code> (report.o + output.o).</li>
+        <li>Flags: <code>-Wall -Wextra -pthread</code> as required; <code>-lrt</code> for shm_open on older glibc.</li>
+        <li>Every <code>.o</code> depends on all headers, so changing a header rebuilds everything.</li>
+        <li><code>TIME_UNIT_MS</code> can be overridden, e.g. <code>make TIME_UNIT_MS=20</code>.</li>
+        <li>Extra targets: <code>test</code>, <code>results</code>, <code>clean</code>.</li>
+      </ul>
+    </div></details>
+
+    <details open><summary><span class="n">A16</span><span class="q">Which bonus did you do?</span></summary><div class="a">
+      <p>The starvation demo (jobs5.txt). P1 (burst 10) arrives at 0, and a 2-unit job arrives every 2 units. Under SJF and SRTF there is always a shorter job, so P1's response time is 18 and it finishes at 28. Under FCFS and RR its response time is 0. SJF/SRTF have better averages (waiting 1.80 vs 9.00), but the long job pays for it.</p>
+    </div></details>
+  </div>
+</section>
+
+<footer>
+  <p class="tip"><strong>Practice tip:</strong> pick a random question from someone else's tab and answer it out loud. The brief says each member is tested on the whole project, not only their own part.</p>
+</footer>
+</div>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.tab');
+  var sections = document.querySelectorAll('section.member');
+  function show(which) {
+    tabs.forEach(function (t) { t.setAttribute('aria-pressed', String(t.dataset.show === which)); });
+    sections.forEach(function (s) {
+      s.hidden = !(which === 'all' || s.dataset.member === which ||
+                  (which !== 'common' && s.dataset.member === 'common' && false));
+    });
+    try { localStorage.setItem('viva-tab', which); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.show); window.scrollTo({ top: 0 }); }); });
+
+  var quiz = document.getElementById('quiz');
+  quiz.addEventListener('click', function () {
+    var on = quiz.getAttribute('aria-pressed') !== 'true';
+    quiz.setAttribute('aria-pressed', String(on));
+    quiz.textContent = 'Quiz mode: ' + (on ? 'on' : 'off');
+    document.querySelectorAll('details').forEach(function (d) { d.open = !on; });
+  });
+
+  var saved = null;
+  try { saved = localStorage.getItem('viva-tab'); } catch (e) {}
+  if (saved && document.querySelector('.tab[data-show="' + saved + '"]')) show(saved);
+})();
+</script>

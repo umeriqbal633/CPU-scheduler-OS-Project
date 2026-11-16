@@ -1,0 +1,12 @@
+# build output
+*.o
+/scheduler
+/logger
+/report
+# runtime output
+schedule.log
+# submission archive and course brief (not part of the source)
+*.zip
+*.pdf
+# stray files
+/wsl

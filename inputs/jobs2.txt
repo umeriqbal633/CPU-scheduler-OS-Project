@@ -1,0 +1,8 @@
+# jobs2.txt - ALL JOBS ARRIVE AT TIME 0
+# Tie-breaking matters here: equal arrival -> smaller job id first.
+# job_id arrival_time burst_time
+P1 0 6
+P2 0 8
+P3 0 7
+P4 0 3
+P5 0 4

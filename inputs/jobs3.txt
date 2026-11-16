@@ -1,0 +1,9 @@
+# jobs3.txt - IDLE GAP
+# The ready queue empties at t=5 while P3/P4 only arrive at t=8,
+# and again at t=13 before P5 arrives at t=15. Lines are not sorted.
+# job_id arrival_time burst_time
+P3 8 4
+P1 0 3
+P5 15 2
+P2 1 2
+P4 9 1

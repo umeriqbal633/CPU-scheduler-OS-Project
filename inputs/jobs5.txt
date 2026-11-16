@@ -1,0 +1,16 @@
+# jobs5.txt - BONUS: STARVATION DEMO
+# P1 is a long job. Short jobs keep arriving so that under SJF and SRTF
+# there is always a shorter job ready, and P1 waits until all of them
+# are done (look at P1's waiting/response time). FCFS and RR serve P1
+# much earlier.
+# job_id arrival_time burst_time
+P1  0 10
+P2  0  2
+P3  2  2
+P4  4  2
+P5  6  2
+P6  8  2
+P7 10  2
+P8 12  2
+P9 14  2
+P10 16 2
